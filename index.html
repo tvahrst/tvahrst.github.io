@@ -1,139 +1,255 @@
 <!DOCTYPE html>
 
 <html lang="en">
-  <head>
-    <title>Cardboard Example</title>
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-    <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
-    <style>
-      body {
-        margin: 0px;
-        overflow: hidden;
-      }
-      #example {
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-      }
-    </style>
-  </head>
-  <body>
-    <div id="example"></div>
+<head>
+<title>Cardboard Example</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<meta name="viewport"
+	content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+<style>
+body {
+	margin: 0px;
+	overflow: hidden;
+}
+
+#example {
+	position: absolute;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+}
+</style>
+</head>
+<body>
+	<div id="example"></div>
 
 	<script src="http://threejs.org/build/three.min.js"></script>
 
-  <script src="js/third-party/threejs/StereoEffect.js"></script>
-  <script src="js/third-party/threejs/DeviceOrientationControls.js"></script>
-  <script src="js/third-party/threejs/OrbitControls.js"></script>
+	<script src="js/third-party/threejs/StereoEffect.js"></script>
+	<script src="js/third-party/threejs/DeviceOrientationControls.js"></script>
+	<script src="js/third-party/threejs/OrbitControls.js"></script>
 
-  <script>
-    var camera, scene, renderer;
-    var effect, controls;
-    var element, container;
+	<script>
+		var camera, scene, renderer;
+		var effect, controls;
+		var element, container;
 
-    var clock = new THREE.Clock();
+		var clock = new THREE.Clock();
 
-    init();
-    animate();
+	    var projector;
+	    var raycaster;
 
-    function init() {
-      renderer = new THREE.WebGLRenderer();
-      element = renderer.domElement;
-      container = document.getElementById('example');
-      container.appendChild(element);
+	    var TTL = 100;
+	    var linkliste = [];
+	    var selectedlink;
 
-      effect = new THREE.StereoEffect(renderer);
+		
+		init();
+		animate();
 
-      scene = new THREE.Scene();
+		function init() {
+			renderer = new THREE.WebGLRenderer();
+			element = renderer.domElement;
+			container = document.getElementById('example');
+			container.appendChild(element);
 
-      camera = new THREE.PerspectiveCamera(90, 1, 0.001, 700);
-      camera.position.set(0, 10, 0);
-      scene.add(camera);
+			effect = new THREE.StereoEffect(renderer);
 
-      controls = new THREE.OrbitControls(camera, element);
-      controls.rotateUp(Math.PI / 4);
-      controls.target.set(
-        camera.position.x + 0.1,
-        camera.position.y,
-        camera.position.z
-      );
-      controls.noZoom = true;
-      controls.noPan = true;
+			scene = new THREE.Scene();
 
-      function setOrientationControls(e) {
-        if (!e.alpha) {
-          return;
-        }
+			camera = new THREE.PerspectiveCamera(90, 1, 0.001, 700);
+			camera.position.set(0, 1, 0);
+			scene.add(camera);
 
-        controls = new THREE.DeviceOrientationControls(camera, true);
-        controls.connect();
-        controls.update();
+		    projector = new THREE.Projector();
+		    raycaster = new THREE.Raycaster();
 
-        element.addEventListener('click', fullscreen, false);
+			
+			controls = new THREE.OrbitControls(camera, element);
+			controls.rotateUp(Math.PI / 4);
+			controls.target.set(camera.position.x + 0.1, camera.position.y,
+					camera.position.z);
+			controls.noZoom = true;
+			controls.noPan = true;
 
-        window.removeEventListener('deviceorientation', setOrientationControls, true);
-      }
-      window.addEventListener('deviceorientation', setOrientationControls, true);
+			function setOrientationControls(e) {
+				if (!e.alpha) {
+					return;
+				}
 
-	var sphere = new THREE.Mesh(
-			new THREE.SphereGeometry(100, 20, 20),
-			new THREE.MeshBasicMaterial({
-				map: THREE.ImageUtils.loadTexture('kupferbrink.jpg')
-			})
-		);
-		sphere.scale.x = -1;
-	scene.add(sphere);
+				controls = new THREE.DeviceOrientationControls(camera, true);
+				controls.connect();
+				controls.update();
 
+				element.addEventListener('click', fullscreen, false);
 
-   
-  
-      window.addEventListener('resize', resize, false);
-      setTimeout(resize, 1);
-    }
+				window.removeEventListener('deviceorientation',
+						setOrientationControls, true);
+			}
+			window.addEventListener('deviceorientation',
+					setOrientationControls, true);
 
-    function resize() {
-      var width = container.offsetWidth;
-      var height = container.offsetHeight;
+			var sphere = new THREE.Mesh(new THREE.SphereGeometry(100, 20, 20),
+					new THREE.MeshBasicMaterial({
+						map : THREE.ImageUtils.loadTexture('kupferbrink.jpg')
+					}));
+			sphere.scale.x = -1;
+			scene.add(sphere);
 
-      camera.aspect = width / height;
-      camera.updateProjectionMatrix();
+			// local scale factor to make the ring appear correct
+			var _SCALE = 3;
 
-      renderer.setSize(width, height);
-      effect.setSize(width, height);
-    }
+			function Cursor() {
+				var geometry = new THREE.RingGeometry(0.85 * Cursor.SIZE * _SCALE, 1 * Cursor.SIZE * _SCALE, 32);
+				var material = new THREE.MeshBasicMaterial({
+					color : 0xffffff,
+					blending : THREE.NormalBlending,
+					side : THREE.DoubleSide,
+					opacity: 0.5,
+					transparent: false
+				});
+				THREE.Mesh.call(this, geometry, material);
+			}
 
-    function update(dt) {
-      resize();
+			Cursor.SIZE = 1 * _SCALE;
+			Cursor.prototype = Object.create(THREE.Mesh.prototype);
+			Cursor.prototype.constructor = Cursor;
 
-      camera.updateProjectionMatrix();
+			cursor = new Cursor();
+			camera.add(cursor);
+			cursor.position.z = -90;
+			cursor.lookAt(camera.position);
 
-      controls.update(dt);
-    }
+			
+			// einen Punkt definieren:
+			var cubegeom = new THREE.CubeGeometry( 10, 10, 0.1 );
+			var cubematerial = new THREE.MeshBasicMaterial({
+				color : 0xdddddd,
+				blending : THREE.NormalBlending,
+				side : THREE.DoubleSide,
+				opacity: 0.5,
+				transparent: true
+			});
 
-    function render(dt) {
-      effect.render(scene, camera);
-    }
+			var cube1 = new THREE.Mesh(cubegeom, cubematerial);
+			cube1.position.z = -95;
+			scene.add(cube1);
 
-    function animate(t) {
-      requestAnimationFrame(animate);
+			// In Linkliste einbinden
+			linkliste.push(cube1);
+			
+			
+			window.addEventListener('resize', resize, false);
+			setTimeout(resize, 1);
+		}
 
-      update(clock.getDelta());
-      render(clock.getDelta());
-    }
+		function resize() {
+			var width = container.offsetWidth;
+			var height = container.offsetHeight;
 
-    function fullscreen() {
-      if (container.requestFullscreen) {
-        container.requestFullscreen();
-      } else if (container.msRequestFullscreen) {
-        container.msRequestFullscreen();
-      } else if (container.mozRequestFullScreen) {
-        container.mozRequestFullScreen();
-      } else if (container.webkitRequestFullscreen) {
-        container.webkitRequestFullscreen();
-      }
-    }
-  </script>
-  </body>
+			camera.aspect = width / height;
+			camera.updateProjectionMatrix();
+
+			renderer.setSize(width, height);
+			effect.setSize(width, height);
+		}
+
+		function findIntersections() {
+		    var gaze = new THREE.Vector3(0, 0, 1);
+
+		    projector.unprojectVector(gaze, camera);
+
+		    raycaster.set(
+		      camera.position,
+		      gaze.sub(camera.position).normalize()
+		    );
+
+		    var intersects = raycaster.intersectObjects(linkliste);
+
+		    // reset
+		    linkliste.forEach(function(i) {
+		      i.scale.set(1, 1, 1);
+		      i.position.z = -95;
+		    });
+		    cursor.scale.set(1, 1, 1);
+
+		    // if found
+		    if (intersects.length > 0) {
+		      var found = intersects[0];
+		      // highlight
+		      found.object.scale.set(1.2, 1.2, 1.2);
+		      //found.object.position.z = 0.1;
+		      if (!selectedlink) {
+		        // navigator.vibrate(30);
+		        selectedlink = {
+		          id: found.object.uuid,
+		          ttl: TTL,
+		          obj: found.object
+		        };
+		      } else {
+		        if (selectedlink.id === found.object.uuid) {
+		          // decrement
+		          selectedlink.ttl -= 1;
+		          var p = (selectedlink.ttl / TTL);
+		          cursor.scale.set(p, p, p);
+		          if (selectedlink.ttl <= 0) {
+		            p = p * 100;
+		            cursor.scale.set(p, p, p);
+		            
+		            // hier link einbauen!
+		            
+		            selectedlink = null;
+		            // this.open(this.selected.obj.parent);
+		            // cursor.scale.set(0,0,0);
+		          }
+		        } else {
+		          // navigator.vibrate(30);
+		          selectedlink = {
+		            id: found.object.uuid,
+		            ttl: TTL,
+		            obj: found.object
+		          };
+		        }
+		      }
+		    } else {
+		      selectedlink = null;
+		    }
+		  };
+		
+		
+		
+		function update(dt) {
+			resize();
+
+			camera.updateProjectionMatrix();
+
+			controls.update(dt);
+		}
+
+		function render(dt) {
+			findIntersections();
+			effect.render(scene, camera);
+		}
+
+		function animate(t) {
+			requestAnimationFrame(animate);
+
+			update(clock.getDelta());
+			render(clock.getDelta());
+		}
+
+		function fullscreen() {
+			if (container.requestFullscreen) {
+				container.requestFullscreen();
+			} else if (container.msRequestFullscreen) {
+				container.msRequestFullscreen();
+			} else if (container.mozRequestFullScreen) {
+				container.mozRequestFullScreen();
+			} else if (container.webkitRequestFullscreen) {
+				container.webkitRequestFullscreen();
+			}
+		}
+	</script>
+</body>
 </html>
